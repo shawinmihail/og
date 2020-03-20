@@ -9,15 +9,20 @@ import matplotlib.animation as animation
 from utils import *
 from consts import Consts
 
+
 # initial
 t = np.linspace(0, 30*60*60, 9999)
-#t = np.linspace(0, 1, 2)
+rtol = 1.49012e-12  # ode precision
+
 
 # ref traj
 oe0 = np.array([700e3 + Consts.rEarth, 0, get_SSO_inclination(700e3 + Consts.rEarth, 0), 0, 0, 0])
 n0 = math.sqrt(Consts.muEarth / oe0[0] ** 3)  # mean motion
 rv0 = oe2rv(oe0)
-traj0 = odeint(central_gravity_motion, rv0, t)
+traj0 = odeint(central_gravity_motion, rv0, t, rtol=rtol)
+
+orb = 1e3 * np.array([0.0000, 2.5981, 1.5000, -0.0032, 0.0000, 0.0000])
+eci = orb_2_eci(rv0, orb, n0)
 
 # plot ref
 # fig = plt.figure()
@@ -25,71 +30,50 @@ traj0 = odeint(central_gravity_motion, rv0, t)
 # plt.plot(traj0[:, 0], traj0[:, 1], traj0[:, 2])
 
 # hyll tetrahedron traj
-A3, B3, C3, D3, E3 = tetrahedron_configuration_1(100, 1, 1, 1)
-ht_trajes = list()
-rvs3 = list()
+K = 1000
+a = 0
+b = -math.sqrt(5)
+c = -K * math.sqrt(10)
+A3, B3, C3, D3, E3 = tetrahedron_configuration_1(K, a, b, c)
+ht_trajs = list()
 for i in range(3):
     traj = hyll_traj(t, n0, A3[i], B3[i], C3[i], D3[i], E3[i])
-    ht_trajes.append(traj)
+    print(np.linalg.norm(traj[0:3]))
+    ht_trajs.append(traj)
+
+# cg tetrahedron traj
+rvs_init = list()
+cg_trajs = list()
+for i in range(3):
+   rv_orb = hyll_traj(np.array([0]), n0, A3[i], B3[i], C3[i], D3[i], E3[i])
+   rv_eci = orb_2_eci(rv0, rv_orb[0], n0)
+   rvs_init.append(rv_eci)
+   traj = odeint(central_gravity_motion, rvs_init[i], t, rtol=rtol)
+   cg_trajs.append(traj-traj0)
+
+## quals
+ht_qual = np.array([])
+for i in range(ht_trajs[0].shape[0]):
+    q = tetrahedron_quality(ht_trajs[0][i, 0:3], ht_trajs[1][i, 0:3], ht_trajs[2][i, 0:3])
+    ht_qual = np.append(ht_qual, q)
+
+cg_qual = np.array([])
+for i in range(cg_trajs[0].shape[0]):
+    q = tetrahedron_quality(cg_trajs[0][i, 0:3], cg_trajs[1][i, 0:3], cg_trajs[2][i, 0:3])
+    cg_qual = np.append(cg_qual, q)
 
 # plot hyll tetrahedron trajes
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-# for traj in ht_trajes:
-#     plt.plot(traj[:, 0], traj[:, 1], traj[:, 2])
-# plt.show()
+# # fig = plt.figure()
+# # ax = fig.add_subplot(111, projection='3d')
+# # for traj in ht_trajes:
+# #     plt.plot(traj[:, 0], traj[:, 1], traj[:, 2])
+# # plt.show()
 
-# plot animated
-fig_a = plt.figure()
-ax_a = p3.Axes3D(fig_a)
-a_lines = list()
-for i in range(3):
-    l, = ax_a.plot([], [], [], lw=3)
-    a_lines.append(l)
+# plot qual
+fig = plt.figure()
+ax = fig.add_subplot()
+plt.plot(t/3600, ht_qual)
+plt.plot(t/3600, cg_qual)
 
-ax_a.set_xlim3d([-200, 200])
-ax_a.set_xlabel('X')
-ax_a.set_ylim3d([-200, 200])
-ax_a.set_ylabel('Y')
-ax_a.set_zlim3d([-200, 200])
-ax_a.set_zlabel('Z')
-
-def animate_a(i):
-
-    for k in range(3):
-        ht_traj = ht_trajes[k]
-        x = np.array([0, ht_traj[i, 0]])
-        y = np.array([0, ht_traj[i, 1]])
-        z = np.array([0, ht_traj[i, 2]])
-        a_lines[k].set_data(x, y)
-        a_lines[k].set_3d_properties(z)
-
-    return a_lines
-
-fig_b = plt.figure()
-ax_b = p3.Axes3D(fig_b)
-line_b, = ax_b.plot([], [], [], lw=3)
-scale = 1.5
-ax_b.set_xlim3d([-Consts.rEarth * scale, Consts.rEarth * scale])
-ax_b.set_xlabel('X')
-ax_b.set_ylim3d([-Consts.rEarth * scale, Consts.rEarth * scale])
-ax_b.set_ylabel('Y')
-ax_b.set_zlim3d([-Consts.rEarth * scale, Consts.rEarth * scale])
-ax_b.set_zlabel('Z')
-
-def animate_b(i):
-    # x = np.array([0, traj0[i, 0]])
-    # y = np.array([0, traj0[i, 1]])
-    # z = np.array([0, traj0[i, 2]])
-    x = traj0[1:i, 0]
-    y = traj0[1:i, 2]
-    z = traj0[1:i, 3]
-
-    line_b.set_data(x, y)
-    line_b.set_3d_properties(z)
-    return line_b,
-
-anim_a = FuncAnimation(fig_a, animate_a, frames=200, interval=20, blit=True)
-anim_b = FuncAnimation(fig_b, animate_b, frames=200, interval=100, blit=True)
 plt.show()
 
