@@ -11,13 +11,14 @@ from consts import Consts
 
 
 # initial
-t = np.linspace(0, 30*60*60, 9999)
+t = np.linspace(0, 15*60*60, 9999)
 rtol = 1.49012e-12  # ode precision
 
 
 # ref traj
-oe0 = np.array([700e3 + Consts.rEarth, 0, get_SSO_inclination(700e3 + Consts.rEarth, 0), 0, 0, 0])
+oe0 = np.array([408e3 + Consts.rEarth, 0, 0, 0, 0, 0])
 n0 = math.sqrt(Consts.muEarth / oe0[0] ** 3)  # mean motion
+print(n0)
 rv0 = oe2rv(oe0)
 traj0 = odeint(central_gravity_motion, rv0, t, rtol=rtol)
 
@@ -62,12 +63,31 @@ for i in range(cg_trajs[0].shape[0]):
     q = tetrahedron_quality(cg_trajs[0][i, 0:3], cg_trajs[1][i, 0:3], cg_trajs[2][i, 0:3])
     cg_qual = np.append(cg_qual, q)
 
-# plot hyll tetrahedron trajes
-# # fig = plt.figure()
-# # ax = fig.add_subplot(111, projection='3d')
-# # for traj in ht_trajes:
-# #     plt.plot(traj[:, 0], traj[:, 1], traj[:, 2])
-# # plt.show()
+
+# plot
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+colors = ['r', 'g', 'b']
+for i in range(3):
+    traj = cg_trajs[i]
+    x = np.array((0, traj[0, 0]))
+    y = np.array((0, traj[0, 1]))
+    z = np.array((0, traj[0, 2]))
+    plt.plot(x, y, z, colors[i])
+
+# for i in range(3):
+#     traj = cg_trajs[i]
+#     x = np.array((0, traj[-1, 0]))
+#     y = np.array((0, traj[-1, 1]))
+#     z = np.array((0, traj[-1, 2]))
+#     plt.plot(x, y, z, colors[i])
+
+for i in range(3):
+    traj = cg_trajs[i]
+    x = traj[:, 0]
+    y = traj[:, 1]
+    z = traj[:, 2]
+    plt.plot(x, y, z, colors[i], linewidth=0.3)
 
 # plot qual
 fig = plt.figure()
