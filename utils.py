@@ -103,6 +103,23 @@ def orb_2_eci(rv0, rv, n):
     return rv_eci
 
 
+def eci_2_orb(rv0, rv, n):
+
+    z_orb = rv0[0:3] / np.linalg.norm(rv0[0:3])
+    y_orb = np.cross(rv0[0:3], rv0[3:6])
+    y_orb = y_orb / np.linalg.norm(y_orb)
+    x_orb = np.cross(y_orb, z_orb)
+
+    M = np.column_stack((x_orb, y_orb, z_orb))
+    M = np.transpose(M)
+
+    r_orb = np.matmul(M, (rv[0:3] - rv0[0:3]))
+    v_orb = np.matmul(M, (rv[3:6] - rv0[3:6]) - np.cross(np.array([0, n, 0]), rv[0:3]))
+
+    rv_orb = np.concatenate((r_orb, v_orb))
+    return rv_orb
+
+
 def hyll_traj(t, n, A, B, C, D, E):
     nu = n * t
     x = 2 * A * np.cos(nu) - 2 * B * np.sin(nu) + C
@@ -148,4 +165,70 @@ def tetrahedron_quality(r1, r2, r3):
     return Q
 
 
+# interpolator utils
+def earth_dipole_vector_ref_frame(incl, lat_arg, a, dr):
+    k = -np.array([np.cos(lat_arg) * np.sin(incl), np.cos(incl), np.sin(lat_arg) * np.sin(incl)])
+    r = np.array([0, 0, a]) + dr
+    rn = np.linalg.norm(r)
+    MU_e = 7.94e+22
+    MU_0 = 1.257e-6
+    B = MU_e * MU_0 / (4 * np.pi * rn ** 3) * (3 / (rn ** 2) * np.dot(r, k) * r - k)
+    return B
 
+
+def earth_dipole_vector_own_frame(incl, lat_arg, a, dr):
+    B = earth_dipole_vector_ref_frame(incl, lat_arg, a, dr)
+    A = A_orb_0_to_j(a, dr)
+    Bj = np.matmul(A, B)
+    return Bj
+
+
+def A_orb_0_to_j(a, dr):
+    """
+    R -- radius-vector to the j-th satellite of the swarm in the reference orbital frame
+    """
+    R = np.array([0, 0, a]) + dr
+    R_w = np.copy(R)
+    R_w[0] = R[2]
+    R_w[1] = 0.
+    R_w[2] = -R[0]
+
+    r = np.linalg.norm(R)
+    r_w = np.linalg.norm(R_w)
+
+    A_x = R_w / r_w
+    A_y = np.array([-R[0] * R[1] / r_w, r_w, -R[1] * R[2] / r_w]) / r
+    A_z = R / r
+
+    A = np.vstack((A_x, A_y, A_z))
+
+    return A
+
+
+def idw(Bs, Rs, R_int, p):
+    """
+    Bs -- array of magnetic fields in points, corresponding to Rs
+    Rs -- array of radius-vectors
+    R_int -- radius-vector to the point of interpolation
+    p -- power parameter of the IDW
+
+    everything in the reference orbital frame
+    """
+
+    delt = Rs - R_int
+    w = np.zeros(len(delt))
+    B_int = np.zeros_like(Bs[0])
+    coef_sum = 0.
+
+    for (i, delt_i) in enumerate(delt):
+
+        r_i = np.linalg.norm(delt_i)
+
+        if r_i == 0:
+            return Bs[i]
+
+        w[i] = r_i ** (-p)
+        B_int += Bs[i] * w[i]
+        coef_sum += w[i]
+
+    return B_int / coef_sum
