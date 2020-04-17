@@ -232,3 +232,55 @@ def idw(Bs, Rs, R_int, p):
         coef_sum += w[i]
 
     return B_int / coef_sum
+
+
+def interpolation_idw(Bs, Rs, p):
+    Bs_int = np.zeros_like(Rs, dtype=float)
+
+    for (i, R) in enumerate(Rs):
+        Rs_for_int = np.delete(Rs, i, axis=0)
+        Bs_for_int = np.delete(Bs, i, axis=0)
+
+        Bs_int[i] = idw(Bs_for_int, Rs_for_int, R, p)
+
+    return Bs_int
+
+
+def ord_kriging(Bs, Rs, R_int, func, popt):
+    semivar_matr = np.zeros_like(Rs[0], dtype=float)
+
+    for R in Rs:
+        col = np.linalg.norm(Rs - R, axis=1)
+        semivar_matr = np.vstack((semivar_matr, col))
+
+    semivar_matr = func(semivar_matr[1:].T, *popt)
+
+    semivar_vec = np.linalg.norm(Rs - R_int, axis=1)
+    semivar_vec = func(semivar_vec, *popt)
+
+    matrix = np.ones((Rs.shape[0] + 1, Rs.shape[0] + 1))
+    matrix[1:, :-1] = semivar_matr
+    matrix[0, -1] = 0
+
+    vector = np.hstack((1, semivar_vec))
+
+    coefs = (np.linalg.inv(matrix) @ vector)[:-1]
+
+    sum = 0
+
+    for (k, B) in zip(coefs, Bs):
+        sum += k * B
+
+    return sum
+
+
+def interpolation_OK(Bs, Rs, func, popt):
+
+    Bs_int = np.zeros_like(Rs, dtype=float)
+    for (i, R) in enumerate(Rs):
+        Rs_for_int = np.delete(Rs, i, axis=0)
+        Bs_for_int = np.delete(Bs, i, axis=0)
+
+        Bs_int[i] = ord_kriging(Bs_for_int, Rs_for_int, R, func, popt)
+
+    return Bs_int

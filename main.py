@@ -5,12 +5,11 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as animation
 from utils import *
 from consts import Consts
-
+from semi_models import *
 
 # initial
-t = np.linspace(0, 1*60*60, 1 * 1000)
+t = np.linspace(0, 2*60*60, 2 * 1000)
 rtol = 1.49012e-12  # ode precision
-
 
 # ref traj
 a0 = 408e3 + Consts.rEarth
@@ -35,6 +34,7 @@ leg_lengths = list()
 for i in range(3):
     traj = hyll_traj(t, n0, A3[i], B3[i], C3[i], D3[i], E3[i])
     l = np.linalg.norm(traj[0, 0:3])
+    print(l)
     leg_lengths.append(l)
     ht_trajs.append(traj)
 
@@ -56,7 +56,6 @@ for i in range(3):
 
     cg_trajs.append(traj_orb)
 
-
 # traj quals
 ht_qual = np.array([])
 for i in range(ht_trajs[0].shape[0]):
@@ -72,35 +71,158 @@ for i in range(cg_trajs[0].shape[0]):
 # magnetic field
 dim = np.shape(traj0)
 ex = np.array([1, 0, 0])
+b_model_trajs = [np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3])]
+b_mes_trajs = [np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3])]
+b_idw_trajs = [np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3])]
+b_ok_trajs = [np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3])]
 for i in range(dim[0]):
     e_obj = traj0[i, 0:3]
     e_obj = e_obj / np.linalg.norm(e_obj)
     lat_arg = np.arccos(np.dot(ex, e_obj))
 
+    # mes
     bs = list()
-    As = list()
+    bs_noisy = list()
     rs = list()
+    dr = np.array([0, 0, 0])
+    b_ref = earth_dipole_vector_ref_frame(incl0, lat_arg, a0, dr)
+    noise = np.random.normal(0, 1e-7, 3)
+    b_ref_noisy = b_ref + noise
+
+    bs.append(b_ref)
+    rs.append(dr)
+    bs_noisy.append(b_ref_noisy)
+
     for k in range(3):
         traj = cg_trajs[k]
         dr = traj[i, 0:3]
-
-        b_own = earth_dipole_vector_own_frame(incl0, lat_arg, a0, dr)
         b_ref = earth_dipole_vector_ref_frame(incl0, lat_arg, a0, dr)
-        A = A_orb_0_to_j(a0, dr)
+        noise = np.random.normal(0, 1e-7, 3)
+        b_ref_noisy = b_ref + noise
 
         bs.append(b_ref)
         rs.append(dr)
-        As.append(A)
+        bs_noisy.append(b_ref_noisy)
 
-    m = 2
-    r_for_idw = rs[m] + 0*np.array([100, 0, 0])
-    b0_int = idw(bs, rs, r_for_idw, p=0.1)
-    # print(rs)
-    print('---')
-    print(bs[m])
-    print(b0_int)
-    print(b0_int - bs[m])
+    # interpolation
+    bs_idw = interpolation_idw(bs_noisy, rs, p=0.1)
 
+    popt1 = [1.64915984e-14, 3.96510280e-12, 6.45185206e+05, 2.36894768e+00]
+    bs_ok = interpolation_OK(bs, rs, powered_exponential, popt1)
+
+    for k in range(4):
+        b_model_trajs[k][i, :] = bs[k]
+        b_mes_trajs[k][i, :] = bs_noisy[k]
+
+        b_idw = bs_idw[k, :]
+        b_idw_trajs[k][i, :] = b_idw
+
+        b_ok = bs_ok[k, :]
+        b_ok_trajs[k][i, :] = b_ok
+
+
+# plot b
+fig = plt.figure()
+for i in range(4):
+    ax = fig.add_subplot(221+i)
+    ax.set_title('Измерения ref, cпутник %s' % (i))
+    ax.set_ylabel('mu')
+    ax.set_xlabel('Время, мин')
+
+    b_idw = b_idw_trajs[i]
+    b_model = b_model_trajs[i]
+    b_mes = b_mes_trajs[i]
+    b_ok = b_ok_trajs[i]
+
+    plt.plot(t/60, b_mes[:, 0], 'r')
+    plt.plot(t/60, b_mes[:, 1], 'g')
+    plt.plot(t/60, b_mes[:, 2], 'b')
+    # plt.savefig('pic/mes.png', dpi=800)
+
+
+# fig = plt.figure()
+# for i in range(4):
+#     ax = fig.add_subplot(221 + i)
+#     ax.set_title('Разница измерений, cпутник0 - cпутник%s' % (i))
+#     ax.set_ylabel('dmu')
+#     ax.set_xlabel('Время, мин')
+#
+#     b_idw = b_idw_trajs[i]
+#     b_model = b_model_trajs[i]
+#     b_mes = b_mes_trajs[i]
+#     b_model0 = b_model_trajs[0]
+#     b_ok = b_ok_trajs[i]
+#
+#     plt.plot(t / 60, b_model[:, 0] - 1 * b_model0[:, 0], 'r')
+#     plt.plot(t / 60, b_model[:, 1] - 1 * b_model0[:, 1], 'g')
+#     plt.plot(t / 60, b_model[:, 2] - 1 * b_model0[:, 2], 'b')
+
+
+# fig = plt.figure()
+# for i in range(4):
+#     ax = fig.add_subplot(221 + i)
+#     ax.set_title('Ошибка интерполяции IDW, cпутник %s' % (i))
+#     ax.set_ylabel('dmu')
+#     ax.set_xlabel('Время, мин')
+#
+#     b_idw = b_idw_trajs[i]
+#     b_model = b_model_trajs[i]
+#     b_mes = b_mes_trajs[i]
+#     b_ok = b_ok_trajs[i]
+#
+#     plt.plot(t / 60, b_idw[:, 0] - 1 * b_model[:, 0], 'r')
+#     plt.plot(t / 60, b_idw[:, 1] - 1 * b_model[:, 1], 'g')
+#     plt.plot(t / 60, b_idw[:, 2] - 1 * b_model[:, 2], 'b')
+
+
+fig = plt.figure()
+for i in range(4):
+    ax = fig.add_subplot(221 + i)
+    ax.set_title('Ошибка интерполяции OK, cпутник %s' % (i))
+    ax.set_ylabel('dmu')
+    ax.set_xlabel('Время, мин')
+
+    b_idw = b_idw_trajs[i]
+    b_model = b_model_trajs[i]
+    b_mes = b_mes_trajs[i]
+    b_ok = b_ok_trajs[i]
+
+    plt.plot(t / 60, b_mes[:, 0] - 1 * b_model[:, 0], 'k')
+    plt.plot(t / 60, b_ok[:, 0] - 1 * b_model[:, 0], 'r')
+    # plt.plot(t / 60, b_idw[:, 0] - 1 * b_model[:, 0], 'g')
+    # plt.plot(t / 60, b_idw[:, 1] - 1 * b_model[:, 1], 'g')
+    # plt.plot(t / 60, b_idw[:, 2] - 1 * b_model[:, 2], 'b')
+
+
+# fig = plt.figure()
+# for i in range(4):
+#     ax = fig.add_subplot(221 + i)
+#     ax.set_title('IDW - OK, cпутник %s' % (i))
+#     ax.set_ylabel('dmu')
+#     ax.set_xlabel('Время, мин')
+#
+#     b_idw = b_idw_trajs[i]
+#     b_model = b_model_trajs[i]
+#     b_ok = b_ok_trajs[i]
+#
+#     plt.plot(t / 60, b_idw[:, 0] - 1 * b_ok[:, 0], 'r')
+#     plt.plot(t / 60, b_idw[:, 1] - 1 * b_ok[:, 1], 'g')
+#     plt.plot(t / 60, b_idw[:, 2] - 1 * b_ok[:, 2], 'b')
+
+plt.show()
+
+
+# # plot b
+# for i in range(4):
+#     fig = plt.figure()
+#     b_idw = b_idw_trajs[i]
+#     b_ok = b_ok_trajs[i]
+#     b_model = b_model_trajs[i]
+#     plt.plot(t / 60, b_ok[:, 0] - 1 * b_idw[:, 0], 'r')
+#     plt.plot(t / 60, b_ok[:, 1] - 1 * b_idw[:, 1], 'g')
+#     plt.plot(t / 60, b_ok[:, 2] - 1 * b_idw[:, 2], 'b')
+#
+# plt.show()
 
 # # plot ----------------------------------------------------------------------------------
 # # trajes
@@ -198,8 +320,7 @@ for i in range(dim[0]):
 #
 #     return leg_lines + bottom_lines + [title]
 #
-# anim = animation.FuncAnimation(fig, animate, interval=2, blit=True, save_count=500)
-# #anim.save('og.html', fps=15)
+# # anim = animation.FuncAnimation(fig, animate, interval=2, blit=True, save_count=500)
 #
 # plt.show()
 
