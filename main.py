@@ -7,6 +7,8 @@ from utils import *
 from consts import Consts
 from semi_models import *
 
+from igrf_utils.igrf import magn_field_ECI, DCM_ECEF_to_ECI
+
 # initial
 t = np.linspace(0, 2*60*60, 2 * 1000)
 rtol = 1.49012e-12  # ode precision

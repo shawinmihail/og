@@ -3,3 +3,5 @@
 !*.py
 !*.ipynb
 !requirements.txt
+!igrf_utils/
+!igrf_utils/*
