@@ -1,54 +1,57 @@
 import numpy as np
 from scipy.integrate import odeint
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as animation
+
 from utils import *
 from consts import Consts
 from semi_models import *
+from plots import *
 
-from igrf_utils.igrf import magn_field_ECI, DCM_ECEF_to_ECI
+np.random.seed(200)
 
 # initial
-t = np.linspace(0, 2*60*60, 2 * 1000)
+t = np.linspace(0, int(1.55 * 60 * 60), int(1/2 * 1.55 * 60 * 60))
+# t = np.linspace(0, 6000, 60000)
 rtol = 1.49012e-12  # ode precision
 
 # ref traj
-a0 = 408e3 + Consts.rEarth
+a0 = 450e3 + Consts.rEarth
 ecc0 = 0
-incl0 = get_SSO_inclination(a0, ecc0)
+incl0 = 87 * np.pi / 180
 oe0 = np.array([a0, ecc0, incl0, 0, 0, 0])
 n0 = math.sqrt(Consts.muEarth / oe0[0] ** 3)  # mean motion
-
 rv0 = oe2rv(oe0)
 traj0 = odeint(central_gravity_motion, rv0, t, rtol=rtol)
 
+# initial tetrahedron construction orb
+initial_sat_conf_orb = list()
+c1m = 35
+c2m = 35
+c3m = 35
 
-# hyll tetrahedron traj
-K = 1000
-a = 0
-b = -math.sqrt(5)
-c = -K * math.sqrt(10)
-A3, B3, C3, D3, E3 = tetrahedron_configuration_1(K, a, b, c)
-
-ht_trajs = list()
-leg_lengths = list()
-for i in range(3):
-    traj = hyll_traj(t, n0, A3[i], B3[i], C3[i], D3[i], E3[i])
-    l = np.linalg.norm(traj[0, 0:3])
-    print(l)
-    leg_lengths.append(l)
-    ht_trajs.append(traj)
+initial_sat_conf_orb.append([25*c1m,    0*c2m,                   -25 * c3m,                      0])
+initial_sat_conf_orb.append([25*c1m,    0*c2m,                    25 * c3m,                      0])
+initial_sat_conf_orb.append([75*c1m,    75*np.sqrt(3)/2*c2m,      0 * c3m,                      np.pi/4.0])
+initial_sat_conf_orb.append([75*c1m,    75*np.sqrt(3)/2*c2m,      0 * c3m,                      7.0*np.pi/4.0])
+support_sat_num = len(initial_sat_conf_orb)
 
 
-# central gravity (cg) tetrahedron traj
-rvs_init = list()
-cg_trajs = list()
-for i in range(3):
-    rv_orb = hyll_traj(np.array([0]), n0, A3[i], B3[i], C3[i], D3[i], E3[i])
-    rv_eci = orb_2_eci(rv0, rv_orb[0], n0)
-    rvs_init.append(rv_eci)
-    traj_eci = odeint(central_gravity_motion, rvs_init[i], t, rtol=rtol)
+initial_rvs_orb = list()
+for i in range(support_sat_num):
+    params = initial_sat_conf_orb[i]
+    rv = hyll_traj_DA_form_2(t, n0, params[0], params[1], params[2], params[3])
+    initial_rvs_orb.append(rv[0])
+
+# central gravity (cg) tetrahedron trajes
+cg_trajs_orb = list()
+cg_trajs_eci = list()
+for i in range(support_sat_num):
+    rv_eci = orb_2_eci(rv0, initial_rvs_orb[i], n0)
+    traj_eci = odeint(central_gravity_motion, rv_eci, t, rtol=rtol)
+    cg_trajs_eci.append(traj_eci)
 
     dim = np.shape(traj_eci)
     traj_orb = np.empty(dim)
@@ -56,273 +59,140 @@ for i in range(3):
         rv_orb = eci_2_orb(traj0[k, :], traj_eci[k, :], n0)
         traj_orb[k] = rv_orb
 
-    cg_trajs.append(traj_orb)
-
-# traj quals
-ht_qual = np.array([])
-for i in range(ht_trajs[0].shape[0]):
-    q = tetrahedron_quality(ht_trajs[0][i, 0:3], ht_trajs[1][i, 0:3], ht_trajs[2][i, 0:3])
-    ht_qual = np.append(ht_qual, q)
-
-cg_qual = np.array([])
-for i in range(cg_trajs[0].shape[0]):
-    q = tetrahedron_quality(cg_trajs[0][i, 0:3], cg_trajs[1][i, 0:3], cg_trajs[2][i, 0:3])
-    cg_qual = np.append(cg_qual, q)
+    cg_trajs_orb.append(traj_orb)
 
 
-# magnetic field
-dim = np.shape(traj0)
+# plot_conf_qual(t, cg_trajs_orb, save=True)
+plot_distances_orb(t, cg_trajs_orb, save=True)
+plot_initial_conf_orb(cg_trajs_orb, save=True)
+plot_distances_from_first(t, cg_trajs_orb)
+# animate_sat_orb(t, cg_trajs_orb)
+plt.show()
+ret
+
+# MF measure
+from igrf_utils.igrf_fast import magn_field_ECI, DCM_ECEF_to_ECI
+lst_flag = True
+lst_depth = 1
+lst_dt = 0.1  # s
 ex = np.array([1, 0, 0])
 b_model_trajs = [np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3])]
 b_mes_trajs = [np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3])]
 b_idw_trajs = [np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3])]
 b_ok_trajs = [np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3]), np.empty([dim[0], 3])]
-for i in range(dim[0]):
-    e_obj = traj0[i, 0:3]
-    e_obj = e_obj / np.linalg.norm(e_obj)
-    lat_arg = np.arccos(np.dot(ex, e_obj))
+lat_arg_t = list()
+for i in range(len(t)):
+
+    # if i < 1:
+    #     continue
+
+    # print(i)
+
+    # e_obj = traj0[i, 0:3]
+    # e_obj = e_obj / np.linalg.norm(e_obj)
+    # lat_arg = np.arccos(np.dot(ex, e_obj))  # check it!
+    lat_arg = n0 * t[i]
+    lat_arg_t.append(lat_arg)
+    lat_arg = lat_arg % (2 * np.pi)
 
     # mes
-    bs = list()
-    bs_noisy = list()
-    rs = list()
-    dr = np.array([0, 0, 0])
-    b_ref = earth_dipole_vector_ref_frame(incl0, lat_arg, a0, dr)
-    noise = np.random.normal(0, 1e-7, 3)
-    b_ref_noisy = b_ref + noise
+    bs_orb = list()
+    bs_noisy_orb = list()
+    rs_orb = list()
+    for k in range(support_sat_num):
 
-    bs.append(b_ref)
-    rs.append(dr)
-    bs_noisy.append(b_ref_noisy)
+        r_eci = cg_trajs_eci[k][i, 0:3]
+        rv_eci = cg_trajs_eci[k][i]
+        b_ref_orb = b_igrf_orb(r_eci, incl0, lat_arg)
+        bs_orb.append(b_ref_orb)
 
-    for k in range(3):
-        traj = cg_trajs[k]
-        dr = traj[i, 0:3]
-        b_ref = earth_dipole_vector_ref_frame(incl0, lat_arg, a0, dr)
-        noise = np.random.normal(0, 1e-7, 3)
-        b_ref_noisy = b_ref + noise
+        noise = np.random.normal(0, 1e2, 3)
+        b_ref_noisy = b_ref_orb + noise
+        bs_noisy_orb.append(b_ref_noisy)
 
-        bs.append(b_ref)
-        rs.append(dr)
-        bs_noisy.append(b_ref_noisy)
+        rv_orb = eci_2_orb(traj0[i, :], rv_eci, n0)
+        rs_orb.append(rv_orb[0:3])
+
+        if lst_flag:
+            for lst_i in range(lst_depth):
+                time_back = lst_dt * (lst_i+1)
+                traj_lst = odeint(central_gravity_motion, rv_eci, [0, -time_back], rtol=rtol)
+                rv_lst_eci = traj_lst[-1]
+                r_lst_eci = rv_lst_eci[0:3]
+                b_lst_ref_orb = b_igrf_orb(r_lst_eci, incl0, lat_arg)
+                bs_orb.append(b_lst_ref_orb)
+
+                b_lst_ref_noisy = b_lst_ref_orb + noise
+                bs_noisy_orb.append(b_lst_ref_noisy)
+
+                rv_lst_orb = eci_2_orb(traj0[i, :], rv_lst_eci, n0)
+                rs_orb.append(rv_lst_orb[0:3])
+
+    if i == 5:
+        plot_orb_conf_orb(rs_orb, save=True)
+        # plt.show()
 
     # interpolation
-    bs_idw = interpolation_idw(bs_noisy, rs, p=0.1)
+    # bs_idw = interpolation_idw(bs_noisy_orb, rs_orb, p=0.1)
 
-    popt1 = [1.64915984e-14, 3.96510280e-12, 6.45185206e+05, 2.36894768e+00]
-    bs_ok = interpolation_OK(bs, rs, powered_exponential, popt1)
+    popt = [5.81016054e-14, 3.11716988e-12, 3.93677367e+05, 2.76660624e+00]
+    # if lat_arg > 5 * np.pi / 6 or lat_arg <= np.pi / 6:
+    #     popt = [5.17790635e-13, 2.41989057e-12, 6.98189856e+05, 2.13108547e+00]
+    # elif lat_arg > np.pi / 6 and lat_arg <= np.pi / 2:
+    #     popt = [5.35883326e-13, 6.67900796e-12, 5.99176901e+05, 2.52993867e+00]
+    # elif lat_arg > np.pi / 2 and lat_arg <= 5 * np.pi / 6:
+    #     popt = [4.81266785e-13, 7.27197232e-12, 5.67228982e+05, 2.30457086e+00]
+
+    bs_ok = interpolation_OK(bs_noisy_orb, rs_orb, powered_exponential, popt)
 
     for k in range(4):
-        b_model_trajs[k][i, :] = bs[k]
-        b_mes_trajs[k][i, :] = bs_noisy[k]
+        b_model_trajs[k][i, :] = bs_orb[k]
+        b_mes_trajs[k][i, :] = bs_noisy_orb[k]
 
-        b_idw = bs_idw[k, :]
-        b_idw_trajs[k][i, :] = b_idw
+        # b_idw = bs_idw[k, :]
+        # b_idw_trajs[k][i, :] = b_idw
 
         b_ok = bs_ok[k, :]
         b_ok_trajs[k][i, :] = b_ok
 
+    # # map mes
+    # Rs_for_int = np.delete(rs_orb, 1, axis=0)
+    # Bs_for_int = np.delete(bs_noisy_orb, 1, axis=0)
+    #
+    # D = 70
+    # step = 1
+    # x = np.arange(-D, D, step)
+    # y = np.arange(-D, D, step)
+    # X, Y = np.meshgrid(x, y)
+    #
+    # Z = np.zeros(shape=(2*D, 2*D))
+    # for ii in range(2*D):
+    #     for jj in range(2*D):
+    #         r_orb = np.array([X[ii, jj], Y[ii, jj], 0])
+    #         ok = ord_kriging(Bs_for_int, Rs_for_int, r_orb, powered_exponential, popt1)
+    #         A_eci_2_orb = RM_rci_2_ref(incl0, lat_arg)
+    #         r_eci = A_eci_2_orb.T @ (r_orb + np.array([0, 0, a0]))
+    #         model = b_igrf_orb(r_eci, incl0, lat_arg)
+    #         ok_err = ok - model
+    #         Z[ii, jj] = np.linalg.norm(ok_err)
+    #
+    # im = plt.imshow(Z, cmap=plt.cm.RdBu, extent=(-D, D, D, -D), interpolation='bilinear')
+    # plt.colorbar(im)
+    # plt.show()
 
 # plot b
-fig = plt.figure()
-for i in range(4):
-    ax = fig.add_subplot(221+i)
-    ax.set_title('Измерения ref, cпутник %s' % (i))
-    ax.set_ylabel('mu')
-    ax.set_xlabel('Время, мин')
-
-    b_idw = b_idw_trajs[i]
-    b_model = b_model_trajs[i]
-    b_mes = b_mes_trajs[i]
-    b_ok = b_ok_trajs[i]
-
-    plt.plot(t/60, b_mes[:, 0], 'r')
-    plt.plot(t/60, b_mes[:, 1], 'g')
-    plt.plot(t/60, b_mes[:, 2], 'b')
-    # plt.savefig('pic/mes.png', dpi=800)
-
-
-# fig = plt.figure()
-# for i in range(4):
-#     ax = fig.add_subplot(221 + i)
-#     ax.set_title('Разница измерений, cпутник0 - cпутник%s' % (i))
-#     ax.set_ylabel('dmu')
-#     ax.set_xlabel('Время, мин')
-#
-#     b_idw = b_idw_trajs[i]
-#     b_model = b_model_trajs[i]
-#     b_mes = b_mes_trajs[i]
-#     b_model0 = b_model_trajs[0]
-#     b_ok = b_ok_trajs[i]
-#
-#     plt.plot(t / 60, b_model[:, 0] - 1 * b_model0[:, 0], 'r')
-#     plt.plot(t / 60, b_model[:, 1] - 1 * b_model0[:, 1], 'g')
-#     plt.plot(t / 60, b_model[:, 2] - 1 * b_model0[:, 2], 'b')
-
-
-# fig = plt.figure()
-# for i in range(4):
-#     ax = fig.add_subplot(221 + i)
-#     ax.set_title('Ошибка интерполяции IDW, cпутник %s' % (i))
-#     ax.set_ylabel('dmu')
-#     ax.set_xlabel('Время, мин')
-#
-#     b_idw = b_idw_trajs[i]
-#     b_model = b_model_trajs[i]
-#     b_mes = b_mes_trajs[i]
-#     b_ok = b_ok_trajs[i]
-#
-#     plt.plot(t / 60, b_idw[:, 0] - 1 * b_model[:, 0], 'r')
-#     plt.plot(t / 60, b_idw[:, 1] - 1 * b_model[:, 1], 'g')
-#     plt.plot(t / 60, b_idw[:, 2] - 1 * b_model[:, 2], 'b')
-
-
-fig = plt.figure()
-for i in range(4):
-    ax = fig.add_subplot(221 + i)
-    ax.set_title('Ошибка интерполяции OK, cпутник %s' % (i))
-    ax.set_ylabel('dmu')
-    ax.set_xlabel('Время, мин')
-
-    b_idw = b_idw_trajs[i]
-    b_model = b_model_trajs[i]
-    b_mes = b_mes_trajs[i]
-    b_ok = b_ok_trajs[i]
-
-    plt.plot(t / 60, b_mes[:, 0] - 1 * b_model[:, 0], 'k')
-    plt.plot(t / 60, b_ok[:, 0] - 1 * b_model[:, 0], 'r')
-    # plt.plot(t / 60, b_idw[:, 0] - 1 * b_model[:, 0], 'g')
-    # plt.plot(t / 60, b_idw[:, 1] - 1 * b_model[:, 1], 'g')
-    # plt.plot(t / 60, b_idw[:, 2] - 1 * b_model[:, 2], 'b')
-
-
-# fig = plt.figure()
-# for i in range(4):
-#     ax = fig.add_subplot(221 + i)
-#     ax.set_title('IDW - OK, cпутник %s' % (i))
-#     ax.set_ylabel('dmu')
-#     ax.set_xlabel('Время, мин')
-#
-#     b_idw = b_idw_trajs[i]
-#     b_model = b_model_trajs[i]
-#     b_ok = b_ok_trajs[i]
-#
-#     plt.plot(t / 60, b_idw[:, 0] - 1 * b_ok[:, 0], 'r')
-#     plt.plot(t / 60, b_idw[:, 1] - 1 * b_ok[:, 1], 'g')
-#     plt.plot(t / 60, b_idw[:, 2] - 1 * b_ok[:, 2], 'b')
+# plot_b_mes(t, b_model_trajs, b_mes_trajs, b_idw_trajs, b_ok_trajs, save=True)
+# plot_b_idw(t, b_model_trajs, b_mes_trajs, b_idw_trajs, b_ok_trajs, save=True)
+# plot_b_ok(t, b_model_trajs, b_mes_trajs, b_idw_trajs, b_ok_trajs, save=True)
+plot_b_ok_vs_mes(lat_arg_t, b_model_trajs, b_mes_trajs, b_idw_trajs, b_ok_trajs, save=True, use_lat_arg=True)
+# plot_b_idw_minus_ok(t, b_model_trajs, b_mes_trajs, b_idw_trajs, b_ok_trajs, save=True)
 
 plt.show()
 
 
-# # plot b
-# for i in range(4):
-#     fig = plt.figure()
-#     b_idw = b_idw_trajs[i]
-#     b_ok = b_ok_trajs[i]
-#     b_model = b_model_trajs[i]
-#     plt.plot(t / 60, b_ok[:, 0] - 1 * b_idw[:, 0], 'r')
-#     plt.plot(t / 60, b_ok[:, 1] - 1 * b_idw[:, 1], 'g')
-#     plt.plot(t / 60, b_ok[:, 2] - 1 * b_idw[:, 2], 'b')
-#
-# plt.show()
+# ok rms sat 0: 53.27619119347923
+# ok rms sat 1: 55.07467829980554
+# ok rms sat 2: 54.08665568397436
+# ok rms sat 3: 52.952870275649104
 
-# # plot ----------------------------------------------------------------------------------
-# # trajes
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-# ax.set_xlabel('x, м')
-# ax.set_ylabel('y, м')
-# ax.set_zlabel('z, м')
-# ax.set_title('Траектории')
-# colors = ['r', 'g', 'b']
-#
-# # cg
-# for i in range(3):
-#     traj = cg_trajs[i]
-#     x = np.array((0, traj[0, 0]))
-#     y = np.array((0, traj[0, 1]))
-#     z = np.array((0, traj[0, 2]))
-#     plt.plot(x, y, z, colors[i])
-#
-# for i in range(3):
-#     traj = cg_trajs[i]
-#     x = traj[:, 0]
-#     y = traj[:, 1]
-#     z = traj[:, 2]
-#     plt.plot(x, y, z, colors[i], linewidth=0.3)
-#
-# # ht
-# for i in range(3):
-#     traj = ht_trajs[i]
-#     x = traj[:, 0]
-#     y = traj[:, 1]
-#     z = traj[:, 2]
-#     plt.plot(x, y, z, 'k', linewidth=0.3)
-#
-# # for i in range(3):
-# #     traj = ht_trajs[i]
-# #     x = np.array((0, traj[0, 0]))
-# #     y = np.array((0, traj[0, 1]))
-# #     z = np.array((0, traj[0, 2]))
-# #     plt.plot(x, y, z, colors[i])
-#
-# # plot qual
-# fig = plt.figure()
-# ax = fig.add_subplot()
-# plt.plot(t/3600, ht_qual)
-# plt.plot(t/3600, cg_qual)
-# ax.set_xlabel('t, ч')
-# ax.set_ylabel('q')
-# ax.set_title('Качество')
-#
-# # animate tet
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-# ax.view_init(30, 30)
-# ax.set_xlabel('x, м')
-# ax.set_ylabel('y, м')
-# ax.set_zlabel('z, м')
-# title = ax.set_title('Тетраэдр')
-#
-# lim = 2000
-# ax.set_xlim3d([-lim, lim])
-# ax.set_ylim3d([-lim, lim])
-# ax.set_zlim3d([-lim, lim])
-#
-# leg_lines = list()
-# for i in range(3):
-#     line, = ax.plot([0, 0, 0], [0, 0, 0], colors[i])
-#     leg_lines.append(line)
-#
-# bottom_lines = list()
-# for i in range(3):
-#     line, = ax.plot([0, 0, 0], [0, 0, 0], 'k')
-#     bottom_lines.append(line)
-#
-# def animate(k):
-#     for i in range(3):
-#         line = leg_lines[i]
-#         traj = cg_trajs[i]
-#         line.set_xdata([0,  traj[k, 0]])
-#         line.set_ydata([0,  traj[k, 1]])
-#         line.set_3d_properties([0,  traj[k, 2]])
-#
-#     for i in range(3):
-#         line = bottom_lines[i]
-#
-#         j = i + 1
-#         if j == 3:
-#             j = 0
-#
-#         line.set_xdata([cg_trajs[i][k, 0], cg_trajs[j][k, 0]])
-#         line.set_ydata([cg_trajs[i][k, 1], cg_trajs[j][k, 1]])
-#         line.set_3d_properties([cg_trajs[i][k, 2], cg_trajs[j][k, 2]])
-#
-#     title.set_text("{:.2f} ч".format(t[k]/3600))
-#
-#     return leg_lines + bottom_lines + [title]
-#
-# # anim = animation.FuncAnimation(fig, animate, interval=2, blit=True, save_count=500)
-#
-# plt.show()
 

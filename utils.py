@@ -2,6 +2,7 @@
 import math
 import numpy as np
 from consts import Consts
+from igrf_utils.igrf_fast import magn_field_ECI, DCM_ECEF_to_ECI
 
 def get_SSO_inclination(a, ecc):
     # The formula for the RAAN drift is taken from D.A. Vallado Fundamentals of
@@ -133,6 +134,35 @@ def hyll_traj(t, n, A, B, C, D, E):
     return np.column_stack((x, y, z, vx, vy, vz))
 
 
+def hyll_traj_DA_form(t, n, C1, C2, alpha):
+
+    nu = n * t
+    x = C1 * np.cos(nu + alpha)
+    y = C2 * np.sin(nu + alpha)
+    z = C1 / 2 * np.sin(nu + alpha)
+
+    vx = - n * C1 * np.sin(nu + alpha)
+    vy = n * C2 * np.cos(nu + alpha)
+    vz = n * C1 / 2 * np.cos(nu + alpha)
+
+    return np.column_stack((x, y, z, vx, vy, vz))
+
+
+def hyll_traj_DA_form_2(t, n, C1, C2, C3, alpha):
+
+    nu = n * t
+    x = C1 * np.cos(nu + alpha) + C3
+    y = C2 * np.sin(nu + alpha)
+    z = C1 / 2.0 * np.sin(nu + alpha)
+
+    vx = -n * C1 * np.sin(nu + alpha)
+    vy = n * C2 * np.cos(nu + alpha)
+    vz = n * C1 / 2.0 * np.cos(nu + alpha)
+
+    return np.column_stack((x, y, z, vx, vy, vz))
+
+
+
 def tetrahedron_configuration_1(K, a, b, c):
     A3 = K * np.array([1, -0.5, -0.5])
     B3 = K * np.array([0, -math.sqrt(3)/2, math.sqrt(3)/2])
@@ -184,9 +214,7 @@ def earth_dipole_vector_own_frame(incl, lat_arg, a, dr):
 
 
 def A_orb_0_to_j(a, dr):
-    """
-    R -- radius-vector to the j-th satellite of the swarm in the reference orbital frame
-    """
+
     R = np.array([0, 0, a]) + dr
     R_w = np.copy(R)
     R_w[0] = R[2]
@@ -206,14 +234,6 @@ def A_orb_0_to_j(a, dr):
 
 
 def idw(Bs, Rs, R_int, p):
-    """
-    Bs -- array of magnetic fields in points, corresponding to Rs
-    Rs -- array of radius-vectors
-    R_int -- radius-vector to the point of interpolation
-    p -- power parameter of the IDW
-
-    everything in the reference orbital frame
-    """
 
     delt = Rs - R_int
     w = np.zeros(len(delt))
@@ -247,14 +267,14 @@ def interpolation_idw(Bs, Rs, p):
 
 
 def ord_kriging(Bs, Rs, R_int, func, popt):
-    semivar_matr = np.zeros_like(Rs[0], dtype=float)
+    # semivar_matr = np.zeros_like(Rs[0], dtype=float)
+    semivar_matr = np.zeros((1, len(Rs)), dtype=float)
 
     for R in Rs:
         col = np.linalg.norm(Rs - R, axis=1)
         semivar_matr = np.vstack((semivar_matr, col))
 
     semivar_matr = func(semivar_matr[1:].T, *popt)
-
     semivar_vec = np.linalg.norm(Rs - R_int, axis=1)
     semivar_vec = func(semivar_vec, *popt)
 
@@ -284,3 +304,31 @@ def interpolation_OK(Bs, Rs, func, popt):
         Bs_int[i] = ord_kriging(Bs_for_int, Rs_for_int, R, func, popt)
 
     return Bs_int
+
+
+def ecef_psi_theta_r(ecef_xyz):
+    phi = np.arctan2(ecef_xyz[1], ecef_xyz[0])
+    theta = np.arctan2(np.sqrt(ecef_xyz[0] ** 2 + ecef_xyz[1] ** 2), ecef_xyz[2])
+    r = np.sqrt(ecef_xyz[0] ** 2 + ecef_xyz[1] ** 2 + ecef_xyz[2] ** 2)
+    return phi, theta, r
+
+
+def RM_rci_2_ref(inc, latarg):
+    A1 = np.array([-np.sin(latarg), np.cos(latarg)*np.cos(inc), np.cos(latarg)*np.sin(inc)])
+    A2 = np.array([0, -np.sin(inc), np.cos(inc)])
+    A3 = np.array([np.cos(latarg), np.sin(latarg) * np.cos(inc), np.sin(latarg) * np.sin(inc)])
+    A = np.vstack((A1, A2, A3))
+    return A
+
+
+def b_igrf_orb(r_eci, incl, lat_arg):
+    JD = 2458964.016262
+    A_ecef_2_eci = DCM_ECEF_to_ECI(JD)
+    A_eci_2_orb = RM_rci_2_ref(incl, lat_arg)
+    r_ecef = A_ecef_2_eci.T @ r_eci
+    phi, theta, r = ecef_psi_theta_r(r_ecef)
+    b_eci = magn_field_ECI(JD, r, theta, phi)
+    b_ref = A_eci_2_orb @ b_eci
+    return b_ref
+
+
