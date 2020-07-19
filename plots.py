@@ -4,6 +4,12 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as animation
 import matplotlib.cm as cm
 from utils import tetrahedron_quality
+from matplotlib import rc
+fs = 12
+rc('font',**{'family':'sans-serif','sans-serif':['Avant Garde']})
+rc('text', usetex=True)
+plt.rc('xtick',labelsize=fs)
+plt.rc('ytick',labelsize=fs)
 
 colors = ['r', 'g', 'b', 'c', 'r--', 'g--', 'b--', 'c--']
 
@@ -14,10 +20,10 @@ def plot_initial_conf_orb(cg_trajs_orb, save=True):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.set_xlabel('x, м')
-    ax.set_ylabel('y, м')
-    ax.set_zlabel('z, м')
-    ax.set_title('Траектории')
+    ax.set_xlabel('x, m')
+    ax.set_ylabel('y, m')
+    ax.set_zlabel('z, m')
+    ax.set_title('Trajes')
 
     # cg
     for i in range(support_sat_num):
@@ -49,10 +55,10 @@ def plot_orb_conf_orb(rs_orb, save=True):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.set_xlabel('x, м')
-    ax.set_ylabel('y, м')
-    ax.set_zlabel('z, м')
-    ax.set_title('Группа')
+    ax.set_xlabel('x, m')
+    ax.set_ylabel('y, m')
+    ax.set_zlabel('z, m')
+    ax.set_title('Group')
 
     # cg
     for i in range(support_sat_num):
@@ -60,7 +66,10 @@ def plot_orb_conf_orb(rs_orb, save=True):
         x = [r[0]]
         y = [r[1]]
         z = [r[2]]
-        plt.plot(x, y, z, 'ro')
+        if i < 3:
+            plt.plot(x, y, z, 'ro')
+        else:
+            plt.plot(x, y, z, 'bo')
 
     if save:
         plt.savefig('pic/mes_conf_with_lst.png', dpi=800)
@@ -100,7 +109,7 @@ def plot_conf_qual(t, cg_trajs_orb, save=True):
     plt.plot(t/60, qs)
 
     if save:
-        plt.savefig('pic/qual.png', dpi=800)
+        plt.savefig('pic/qual.png', dpi=600)
 
 
 def plot_distances_orb(t, cg_trajs_orb, save=True):
@@ -109,9 +118,9 @@ def plot_distances_orb(t, cg_trajs_orb, save=True):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.set_xlabel('t, мин')
-    ax.set_ylabel('r, м')
-    ax.set_title('Дистанция')
+    ax.set_xlabel('t, min')
+    ax.set_ylabel('r, m')
+    ax.set_title('dist')
 
     # for i in range(support_sat_num):
     #
@@ -137,8 +146,10 @@ def plot_distances_orb(t, cg_trajs_orb, save=True):
 
         plt.plot(t/60, dist, colors[i])
 
-    if save:
-        plt.savefig('pic/dists.png', dpi=800)
+        # lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+    # if save:
+    #     plt.savefig('pic/dists.pdf', dpi=300, bbox_extra_artists=(lgd,), bbox_inches='tight')
 
 def plot_distances_from_first(t, cg_trajs_orb):
 
@@ -320,13 +331,13 @@ def plot_b_ok_vs_mes(t, b_model_trajs, b_mes_trajs, b_idw_trajs, b_ok_trajs, sav
     fig = plt.figure()
     for i in range(4):
         ax = fig.add_subplot(221 + i)
-        ax.set_title('Ошибка интерполяции OK, cпутник %s' % (i))
+        ax.set_title('Error sat %s' % (i))
         ax.set_ylabel('dmu')
 
         if use_lat_arg:
-            ax.set_xlabel('lat arg, deg')
+            ax.set_xlabel('${\\theta}, ^{\circ}$')
         else:
-            ax.set_xlabel('Время, мин')
+            ax.set_xlabel('t, min')
 
         b_idw = b_idw_trajs[i]
         b_model = b_model_trajs[i]
@@ -351,3 +362,44 @@ def plot_b_ok_vs_mes(t, b_model_trajs, b_mes_trajs, b_idw_trajs, b_ok_trajs, sav
 
         if save:
             plt.savefig('pic/ok_vs_mes_2.png', dpi=800)
+
+def plot_b_ok_vs_mes2(t, b_model_vector, b_mes_vector, b_ok_vector, sut_num, y_label, color):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_title('Satellite %s' % (sut_num), fontsize=fs+4)
+    ax.set_ylabel('RMSE$_%s$, nT' % (y_label), fontsize=fs)
+    ax.set_xlabel('${\\theta}, ^{\circ}$', fontsize=fs+2)
+
+    plt.plot(np.array(t) * 180 / np.pi, b_mes_vector - b_model_vector, 'k', label='mes err, %s' % (y_label))
+    plt.plot(np.array(t) * 180 / np.pi, b_ok_vector - b_model_vector, color, label='OK err, %s' % (y_label))
+    rms_sat_ok = np.sqrt(np.mean(np.square(b_ok_vector - b_model_vector)))
+
+    lgd = ax.legend(bbox_to_anchor=(0.72, 0.97), loc=2, borderaxespad=0.)
+    ax.set_ylim([-500, 500])
+    plt.savefig('pic/ok_vs_mes_sat_%s_%s_rms_%.1f.png' % (sut_num, y_label, rms_sat_ok), dpi=450, bbox_extra_artists=(lgd,), bbox_inches='tight')
+
+
+
+def plot_b_ok_vs_mes2_norm(t, b_model_vector, b_mes_vector, b_ok_vector, sut_num, y_label, color):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_title('Satellite %s' % (sut_num), fontsize=fs+4)
+    ax.set_ylabel('$|$RMSE$|$, nT', fontsize=fs)
+    ax.set_xlabel('${\\theta}, ^{\circ}$', fontsize=fs+2)
+
+    errs_mes = list()
+    for i in range(len(t)):
+        err = np.linalg.norm(b_mes_vector[i, :] - b_model_vector[i, :])
+        errs_mes.append(err)
+
+    errs_ok = list()
+    for i in range(len(t)):
+        err = np.linalg.norm(b_ok_vector[i, :] - b_model_vector[i, :])
+        errs_ok.append(err)
+
+    rms_sat_ok = np.sqrt(np.mean(np.square(errs_ok)))
+
+    plt.plot(np.array(t) * 180 / np.pi, errs_mes, 'k', label='mes err, %s' % (y_label))
+    plt.plot(np.array(t) * 180 / np.pi, errs_ok, color, label='OK err, %s' % (y_label))
+    lgd = ax.legend(bbox_to_anchor=(0.72, 0.97), loc=2, borderaxespad=0.)
+    plt.savefig('pic/ok_vs_mes_sat_%s_%s_rms_%.1f.png' % (sut_num, y_label, rms_sat_ok), dpi=450, bbox_extra_artists=(lgd,), bbox_inches='tight')

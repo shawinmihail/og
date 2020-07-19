@@ -11,11 +11,18 @@ from semi_models import *
 from plots import *
 from experiments.experiment_distance import run_experiment_distance
 
+from matplotlib import rc
+fs = 12
+rc('font',**{'family':'sans-serif','sans-serif':['Avant Garde']})
+rc('text', usetex=True)
+plt.rc('xtick',labelsize=fs)
+plt.rc('ytick',labelsize=fs)
+
 from igrf_utils.igrf_fast import magn_field_ECI, DCM_ECEF_to_ECI
 
 # initial
 t = np.linspace(0, int(1.5 * 60 * 60), int(1/5 * 1.5 * 60 * 60))
-# t = np.linspace(0, 1500, 500)
+# t = np.linspace(0, 999, 999)
 rtol = 1.49012e-12  # ode precision
 
 # ref traj
@@ -29,10 +36,6 @@ rv0 = oe2rv(oe0)
 traj0 = odeint(central_gravity_motion, rv0, t, rtol=rtol)
 
 # ok params
-# popt0 = [5.81016054e-14, 3.11716988e-12, 3.93677367e+05, 2.76660624e+00]
-# popt1 = [1.27617535e-13, 3.45337501e-12, 4.42403930e+05, 2.15852834e+00]
-# popt2 = [5.35883326e-13, 6.67900796e-12, 5.99176901e+05, 2.52993867e+00]
-
 popt0 = [4.13787066e-14, 2.47789190e-12, 3.63634942e+05, 2.77180058e+00]
 popt1 = [1.53932238e-13, 2.86297598e-12, 3.89287543e+05, 2.51784409e+00]
 popt2 = [5.01913257e-13, 2.12675006e-12, 3.35439656e+05, 2.72733285e+00]
@@ -63,7 +66,7 @@ for k in range(len(popts)):
         sat_dist_i = list()
         sat_err_i = list()
 
-        for i in range(15):
+        for i in range(25):
             print("k: %s, s: %s, i: %s" % (k, s, i))
             c_mult = 5 + i*10
             sat_dists, sat_errs = run_experiment_distance(oe0, traj0, t, c_mult, rtol, popt, func, seed+s)
@@ -78,12 +81,14 @@ for k in range(len(popts)):
 
 
 # plot
+n = 2
 fig = plt.figure()
 ax = fig.add_subplot(111)
-ax.set_xlabel('l, m')
-ax.set_ylabel('rms, nT')
+ax.set_title("RMSE vs Size", fontsize=fs+4)
+ax.set_xlabel('l, m', fontsize=fs)
+ax.set_ylabel('$|$RMSE$|$, nT', fontsize=fs)
+ls_avg_ = []
 
-n = 2
 for k in range(len(popts)):
     sat_dist_s = sat_dist_k[k]
     sat_err_s = sat_err_k[k]
@@ -102,9 +107,12 @@ for k in range(len(popts)):
             rms_avg[i] += sat_err_i[i][n] / len(sat_dist_s)
             ls_avg[i] += sat_dist_i[i][n] / len(sat_dist_s)
     plt.plot(ls_avg, rms_avg, colors[k], label='popt%s' % (k+1))
+    ls_avg_ = ls_avg
+
+mes_error_lvl = 173.205
+plt.plot([ls_avg_[0], ls_avg_[-1]], [mes_error_lvl, mes_error_lvl], 'k--', label='mes err')
 
 ax.legend()
-ax.set_ylim([75, 175])
-ax.legend()
-plt.savefig('pic/rms(l)_100_seeds2.png', dpi=800)
+ax.set_ylim([75, 225])
+plt.savefig('pic/rms_vs_dist_avg_sat_%s_usehist.png' % (n+1), dpi=300)
 plt.show()
