@@ -30,11 +30,11 @@ initial_sat_conf_orb = list()
 c1m = 35
 c2m = 35
 c3m = 35
-
 initial_sat_conf_orb.append([25*c1m,    0*c2m,                   -25 * c3m,                      0])
 initial_sat_conf_orb.append([25*c1m,    0*c2m,                    25 * c3m,                      0])
 initial_sat_conf_orb.append([75*c1m,    75*np.sqrt(3)/2*c2m,      0 * c3m,                      np.pi/4.0])
 initial_sat_conf_orb.append([75*c1m,    75*np.sqrt(3)/2*c2m,      0 * c3m,                      7.0*np.pi/4.0])
+
 support_sat_num = len(initial_sat_conf_orb)
 
 
@@ -57,16 +57,17 @@ for i in range(support_sat_num):
         rv_orb = eci_2_orb(traj0[k, :], traj_eci[k, :], n0)
         traj_orb[k] = rv_orb
 
+    print(np.linalg.norm(traj_orb[0, 0:3]))
     cg_trajs_orb.append(traj_orb)
 
 
 # plot_conf_qual(t, cg_trajs_orb, save=True)
 # plot_distances_orb(t, cg_trajs_orb, save=True)
 # plot_initial_conf_orb(cg_trajs_orb, save=True)
-# plot_distances_from_first(t, cg_trajs_orb)
+plot_distances_from_first(t, cg_trajs_orb)
 # animate_sat_orb(t, cg_trajs_orb)
-# plt.show()
-
+plt.show()
+ret
 
 # MF measure
 from igrf_utils.igrf_fast import magn_field_ECI, DCM_ECEF_to_ECI
@@ -134,7 +135,12 @@ for i in range(len(t)):
     # interpolation
     # bs_idw = interpolation_idw(bs_noisy_orb, rs_orb, p=0.1)
 
-    popt = [5.81016054e-14, 3.11716988e-12, 3.93677367e+05, 2.76660624e+00]
+
+    popt0 = [4.13787066e-14, 2.47789190e-12, 3.63634942e+05, 2.77180058e+00]
+    popt1 = [1.53932238e-13, 2.86297598e-12, 3.89287543e+05, 2.51784409e+00]
+    popt2 = [5.01913257e-13, 2.12675006e-12, 3.35439656e+05, 2.72733285e+00]
+    popt = popt0
+
     # if lat_arg > 5 * np.pi / 6 or lat_arg <= np.pi / 6:
     #     popt = [5.17790635e-13, 2.41989057e-12, 6.98189856e+05, 2.13108547e+00]
     # elif lat_arg > np.pi / 6 and lat_arg <= np.pi / 2:
@@ -187,9 +193,9 @@ for i in range(len(t)):
 # plot_b_idw_minus_ok(t, b_model_trajs, b_mes_trajs, b_idw_trajs, b_ok_trajs, save=True)
 
 for sat_num in range(4):
-    plot_b_ok_vs_mes2(lat_arg_t, b_model_trajs[sat_num][:, 0], b_mes_trajs[sat_num][:, 0], b_ok_trajs[sat_num][:, 0], sat_num + 1, 'x', 'r')
-    plot_b_ok_vs_mes2(lat_arg_t, b_model_trajs[sat_num][:, 1], b_mes_trajs[sat_num][:, 1], b_ok_trajs[sat_num][:, 1], sat_num + 1, 'y', 'g')
-    plot_b_ok_vs_mes2(lat_arg_t, b_model_trajs[sat_num][:, 2], b_mes_trajs[sat_num][:, 2], b_ok_trajs[sat_num][:, 2], sat_num + 1, 'z', 'b')
+    plot_b_ok_vs_mes2(lat_arg_t, b_model_trajs[sat_num][:, 0], b_mes_trajs[sat_num][:, 0], b_ok_trajs[sat_num][:, 0], sat_num + 1, 'X', 'r')
+    plot_b_ok_vs_mes2(lat_arg_t, b_model_trajs[sat_num][:, 1], b_mes_trajs[sat_num][:, 1], b_ok_trajs[sat_num][:, 1], sat_num + 1, 'Y', 'g')
+    plot_b_ok_vs_mes2(lat_arg_t, b_model_trajs[sat_num][:, 2], b_mes_trajs[sat_num][:, 2], b_ok_trajs[sat_num][:, 2], sat_num + 1, 'Z', 'b')
     plot_b_ok_vs_mes2_norm(lat_arg_t, b_model_trajs[sat_num], b_mes_trajs[sat_num], b_ok_trajs[sat_num], sat_num + 1, 'abs', 'c')
 plt.show()
 

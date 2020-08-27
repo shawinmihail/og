@@ -162,6 +162,20 @@ def hyll_traj_DA_form_2(t, n, C1, C2, C3, alpha):
     return np.column_stack((x, y, z, vx, vy, vz))
 
 
+def hyll_traj_DA_form_3(t, n, C1, C2, C3, alpha, beta):
+
+    nu = n * t
+    x = C1 * np.cos(nu + alpha) + C3
+    y = C2 * np.sin(nu + beta)
+    z = C1 / 2.0 * np.sin(nu + alpha)
+
+    vx = -n * C1 * np.sin(nu + alpha)
+    vy = n * C2 * np.cos(nu + beta)
+    vz = n * C1 / 2.0 * np.cos(nu + alpha)
+
+    return np.column_stack((x, y, z, vx, vy, vz))
+
+
 
 def tetrahedron_configuration_1(K, a, b, c):
     A3 = K * np.array([1, -0.5, -0.5])

@@ -20,18 +20,19 @@ def plot_initial_conf_orb(cg_trajs_orb, save=True):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.set_xlabel('x, m')
-    ax.set_ylabel('y, m')
-    ax.set_zlabel('z, m')
-    ax.set_title('Trajes')
+    ax.set_xlabel('X, m')
+    ax.set_ylabel('Y, m')
+    ax.set_zlabel('Z, m')
+    # ax.set_title('Trajes')
 
     # cg
+    colors_sat = ['ko', 'ko', 'ko', 'ko']
     for i in range(support_sat_num):
         traj = cg_trajs_orb[i]
         x = np.array((0, traj[0, 0]))
         y = np.array((0, traj[0, 1]))
         z = np.array((0, traj[0, 2]))
-        plt.plot(x, y, z, colors[i])
+        plt.plot(x, y, z, colors_sat[i])
 
     for i in range(support_sat_num):
         traj = cg_trajs_orb[i]
@@ -41,7 +42,7 @@ def plot_initial_conf_orb(cg_trajs_orb, save=True):
         plt.plot(x, y, z, colors[i], linewidth=0.3)
 
     if save:
-        plt.savefig('pic/sat_conf.png', dpi=800)
+        plt.savefig('pic/sat_conf.png', dpi=450)
 
 
 def plot_orb_conf_orb(rs_orb, save=True):
@@ -157,10 +158,11 @@ def plot_distances_from_first(t, cg_trajs_orb):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.set_xlabel('t, мин')
-    ax.set_ylabel('r, м')
+    ax.set_xlabel('Time, min')
+    ax.set_ylabel('Distance, m')
+    ax.grid()
     # ax.set_ylim([0, 150])
-    ax.set_title('Дистанция от первого спутника')
+    # ax.set_title('Дистанция от первого спутника')
 
     # for i in range(support_sat_num):
     #
@@ -176,7 +178,12 @@ def plot_distances_from_first(t, cg_trajs_orb):
             d = np.linalg.norm(cg_trajs_orb[0][k, 0:3] - cg_trajs_orb[i+1][k, 0:3])
             dist.append(d)
 
-        plt.plot(t/60, dist, colors[i])
+        plt.plot(t/60, dist, colors[i], label='To satellite %s' % (i + 2))
+
+    lgd = ax.legend(bbox_to_anchor=(0.67, 0.25), loc=2, borderaxespad=0., fontsize=fs)
+    ax.set_ylim([1000, 3500])
+    ax.set_xlim([-3, 102])
+    plt.savefig('pic/dist_from_sat1.png', dpi=450, bbox_extra_artists=(lgd,), bbox_inches='tight')
 
 
 def animate_sat_orb(t, cg_trajs_orb):
@@ -366,15 +373,18 @@ def plot_b_ok_vs_mes(t, b_model_trajs, b_mes_trajs, b_idw_trajs, b_ok_trajs, sav
 def plot_b_ok_vs_mes2(t, b_model_vector, b_mes_vector, b_ok_vector, sut_num, y_label, color):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.set_title('Satellite %s' % (sut_num), fontsize=fs+4)
+    # ax.set_title('Satellite %s' % (sut_num), fontsize=fs+4)
     ax.set_ylabel('RMSE$_%s$, nT' % (y_label), fontsize=fs)
-    ax.set_xlabel('${\\theta}, ^{\circ}$', fontsize=fs+2)
+    # ax.set_xlabel('${\\theta}, ^{\circ}$', fontsize=fs+2)
+    ax.set_xlabel('Argument of latitude, deg', fontsize=fs)
+    ax.grid()
 
-    plt.plot(np.array(t) * 180 / np.pi, b_mes_vector - b_model_vector, 'k', label='mes err, %s' % (y_label))
-    plt.plot(np.array(t) * 180 / np.pi, b_ok_vector - b_model_vector, color, label='OK err, %s' % (y_label))
+    plt.plot(np.array(t) * 180 / np.pi, b_mes_vector - b_model_vector, 'k', label='Measurement error, %s' % (y_label))
+    plt.plot(np.array(t) * 180 / np.pi, b_ok_vector - b_model_vector, color, label=' Ordinary Kriging error, %s' % (y_label))
     rms_sat_ok = np.sqrt(np.mean(np.square(b_ok_vector - b_model_vector)))
 
-    lgd = ax.legend(bbox_to_anchor=(0.72, 0.97), loc=2, borderaxespad=0.)
+    lgd = ax.legend(bbox_to_anchor=(0.03, 0.97), loc=2, borderaxespad=0., fontsize=fs)
+    ax.set_xlim([0, 360])
     ax.set_ylim([-500, 500])
     plt.savefig('pic/ok_vs_mes_sat_%s_%s_rms_%.1f.png' % (sut_num, y_label, rms_sat_ok), dpi=450, bbox_extra_artists=(lgd,), bbox_inches='tight')
 
@@ -383,9 +393,11 @@ def plot_b_ok_vs_mes2(t, b_model_vector, b_mes_vector, b_ok_vector, sut_num, y_l
 def plot_b_ok_vs_mes2_norm(t, b_model_vector, b_mes_vector, b_ok_vector, sut_num, y_label, color):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.set_title('Satellite %s' % (sut_num), fontsize=fs+4)
+    # ax.set_title('Satellite %s' % (sut_num), fontsize=fs+4)
     ax.set_ylabel('$|$RMSE$|$, nT', fontsize=fs)
-    ax.set_xlabel('${\\theta}, ^{\circ}$', fontsize=fs+2)
+    # ax.set_xlabel('${\\theta}, ^{\circ}$', fontsize=fs+2)
+    ax.set_xlabel('Argument of latitude, deg', fontsize=fs)
+    ax.grid()
 
     errs_mes = list()
     for i in range(len(t)):
@@ -399,7 +411,9 @@ def plot_b_ok_vs_mes2_norm(t, b_model_vector, b_mes_vector, b_ok_vector, sut_num
 
     rms_sat_ok = np.sqrt(np.mean(np.square(errs_ok)))
 
-    plt.plot(np.array(t) * 180 / np.pi, errs_mes, 'k', label='mes err, %s' % (y_label))
-    plt.plot(np.array(t) * 180 / np.pi, errs_ok, color, label='OK err, %s' % (y_label))
-    lgd = ax.legend(bbox_to_anchor=(0.72, 0.97), loc=2, borderaxespad=0.)
+    plt.plot(np.array(t) * 180 / np.pi, errs_mes, 'k', label='Measurement error, %s' % (y_label))
+    plt.plot(np.array(t) * 180 / np.pi, errs_ok, color, label=' Ordinary Kriging error, %s' % (y_label))
+    lgd = ax.legend(bbox_to_anchor=(0.03, 0.97), loc=2, borderaxespad=0., fontsize=fs)
+    ax.set_xlim([0, 360])
+    ax.set_ylim([0, 575])
     plt.savefig('pic/ok_vs_mes_sat_%s_%s_rms_%.1f.png' % (sut_num, y_label, rms_sat_ok), dpi=450, bbox_extra_artists=(lgd,), bbox_inches='tight')

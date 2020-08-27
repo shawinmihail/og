@@ -22,7 +22,7 @@ from igrf_utils.igrf_fast import magn_field_ECI, DCM_ECEF_to_ECI
 
 # initial
 t = np.linspace(0, int(1.5 * 60 * 60), int(1/5 * 1.5 * 60 * 60))
-# t = np.linspace(0, 999, 999)
+# t = np.linspace(0, 99, 99)
 rtol = 1.49012e-12  # ode precision
 
 # ref traj
@@ -62,7 +62,7 @@ for k in range(len(popts)):
     sat_dist_s = list()
     sat_err_s = list()
 
-    for s in range(10):
+    for s in range(1):
         sat_dist_i = list()
         sat_err_i = list()
 
@@ -84,8 +84,8 @@ for k in range(len(popts)):
 n = 2
 fig = plt.figure()
 ax = fig.add_subplot(111)
-ax.set_title("RMSE vs Size", fontsize=fs+4)
-ax.set_xlabel('l, m', fontsize=fs)
+# ax.set_title("RMSE vs Size", fontsize=fs+4)
+ax.set_xlabel('Size, m', fontsize=fs)
 ax.set_ylabel('$|$RMSE$|$, nT', fontsize=fs)
 ls_avg_ = []
 
@@ -106,13 +106,16 @@ for k in range(len(popts)):
             rms.append(sat_err_i[i][n])
             rms_avg[i] += sat_err_i[i][n] / len(sat_dist_s)
             ls_avg[i] += sat_dist_i[i][n] / len(sat_dist_s)
-    plt.plot(ls_avg, rms_avg, colors[k], label='popt%s' % (k+1))
+    labels = ['$\sigma = 0$ nT', '$\sigma = 200$ nT', '$\sigma = 400$ nT']
+    plt.plot(ls_avg, rms_avg, colors[k], label=labels[k])
     ls_avg_ = ls_avg
 
 mes_error_lvl = 173.205
-plt.plot([ls_avg_[0], ls_avg_[-1]], [mes_error_lvl, mes_error_lvl], 'k--', label='mes err')
+plt.plot([ls_avg_[0], ls_avg_[-1]], [mes_error_lvl, mes_error_lvl], 'k--', label='$\delta = 173$ nT')
 
-ax.legend()
+lgd = ax.legend(bbox_to_anchor=(0.03, 0.97), loc=2, borderaxespad=0.)
+ax.set_xlim([0, 17500])
 ax.set_ylim([75, 225])
-plt.savefig('pic/rms_vs_dist_avg_sat_%s_usehist.png' % (n+1), dpi=300)
+ax.grid()
+plt.savefig('pic/rms_vs_dist_avg_sat_%s.png' % (n+1), dpi=450, bbox_extra_artists=(lgd,), bbox_inches='tight')
 plt.show()
